@@ -15,6 +15,12 @@ app.get('/products' , async (req, res)=>{
     res.send(products);
 })
 
+app.get('/products/:_id' , async(req, res)=>{
+    const productId = req.params;
+    const product = await productSchema.findById(productId, function (err, adventure) {});
+    res.send(product);
+})
+
 app.listen(5000 , ()=> console.log('Server is working'));
 
 try{

@@ -8,6 +8,7 @@ const flash = require('connect-flash');
 const session = require('express-session');
 const validator = require('express-validator');
 const MongoStore = require('connect-mongo')(session);
+const valid = require('express-validator');
 const getToken = require('./jwt');
 const isAuth = require('./isAuth');
 const app = express();
@@ -22,6 +23,7 @@ app.use((req, res, next) => {
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(valid());
 app.use(
     session({
       secret: 'secret',
@@ -47,18 +49,24 @@ app.get('/products/:_id' , async(req, res)=>{
     res.send(product);
 })
 
-app.post('/signup' , function(req, res, next){
- passport.authenticate('local.signup' , function(err, user, info){
-     
-     if(err){
-         console.log(err);
-     }
-     req.logIn(user, function(err) {
-      if (err) {return res.send({body : req.flash('error'),
-                                 type : 'danger' }); }
-      return res.send({body :req.flash('success'), type : 'success'});
-    });
-  })(req, res, next);
+app.put('/' , isAuth, (req , res)=>{
+  console.log('put!');
+})
+
+app.post('/signup' , async function(req, res){
+ const foundUser = await userSchema.findOne({email : req.body.email,
+password : req.body.password});
+ if(foundUser){
+  res.status(200).send({
+    _id : foundUser._id,
+    email : foundUser.email,
+    
+  })
+ }
+ else{
+  return res.status(401).send({message : 'Invalid password or email!'})
+ }
+
 })
 
 app.post('/signin',  async function(req, res){
@@ -67,19 +75,35 @@ app.post('/signin',  async function(req, res){
    email : req.body.email,
    password : req.body.password
  });
- const newUser = await user.save();
- if(newUser){
-   res.send({
-     _id : newUser._id,
-     name : newUser.name,
-     email : newUser.email,
-     token : getToken(newUser)
-   })
+ const foundUser = await userSchema.findOne({email : user.email}).exec();
+ if (foundUser){
+   return res.status(214).send({message : 'email is already!'});
  }
+ req.checkBody('email' , 'Invaild email!').notEmpty().isEmail();
+ req.checkBody('password' , 'Invaild passsword').notEmpty().isLength({min:4});
+ const errors = req.validationErrors();
+ if(errors){
+   let resErrors = '';
+   errors.forEach((error)=> resErrors += error.msg + " ")
+   return res.status(401).send({resErrors : resErrors})
+ }
+    
+    const newUser = await user.save();
+    if(newUser){
+      res.status(200).send({
+        _id : newUser._id,
+        email : newUser.email,
+        token : getToken(newUser)
+      })
+    }
 });
 
 app.get('/signin' , isAuth,  (req, res)=>{
   res.send('done!');
+})
+
+app.get('/' , isAuth, (req,res)=>{
+  res.send('done');
 })
 
 app.listen(5000 , ()=> console.log('Server is working'));
